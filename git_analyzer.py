@@ -7,8 +7,9 @@ A tool for analyzing Git repository commit history and generating statistics.
 import os
 import sys
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict, Counter
+import calendar
 
 try:
     import git
@@ -53,16 +54,46 @@ class GitCommitAnalyzer:
             "authors": dict(authors),
             "date_range": date_range
         }
+    
+    def analyze_commit_frequency(self):
+        """Analyze commit frequency patterns."""
+        commits = list(self.repo.iter_commits())
+        if not commits:
+            return {}
+        
+        hourly_counts = defaultdict(int)
+        daily_counts = defaultdict(int)
+        monthly_counts = defaultdict(int)
+        weekday_counts = defaultdict(int)
+        
+        for commit in commits:
+            dt = commit.committed_datetime
+            hourly_counts[dt.hour] += 1
+            daily_counts[dt.date().isoformat()] += 1
+            monthly_counts[f"{dt.year}-{dt.month:02d}"] += 1
+            weekday_counts[calendar.day_name[dt.weekday()]] += 1
+        
+        return {
+            "hourly_distribution": dict(hourly_counts),
+            "daily_commits": dict(daily_counts),
+            "monthly_commits": dict(monthly_counts),
+            "weekday_distribution": dict(weekday_counts)
+        }
 
 
 @click.command()
 @click.option('--repo', '-r', default='.', help='Path to git repository (default: current directory)')
 @click.option('--output', '-o', type=click.Choice(['json', 'text']), default='text', help='Output format')
-def main(repo, output):
+@click.option('--frequency', '-f', is_flag=True, help='Include commit frequency analysis')
+def main(repo, output, frequency):
     """Analyze Git commit history and generate statistics."""
     try:
         analyzer = GitCommitAnalyzer(repo)
         stats = analyzer.get_commit_stats()
+        
+        if frequency:
+            freq_stats = analyzer.analyze_commit_frequency()
+            stats['frequency_analysis'] = freq_stats
         
         if output == 'json':
             print(json.dumps(stats, indent=2))
@@ -79,6 +110,23 @@ def main(repo, output):
                 print(f"\nAuthors:")
                 for author, count in stats['authors'].items():
                     print(f"  {author}: {count} commits")
+                
+                if frequency and 'frequency_analysis' in stats:
+                    freq_data = stats['frequency_analysis']
+                    
+                    print(f"\n=== Frequency Analysis ===")
+                    
+                    print(f"\nMost active hours (24h format):")
+                    hourly = sorted(freq_data['hourly_distribution'].items(), 
+                                  key=lambda x: x[1], reverse=True)[:5]
+                    for hour, count in hourly:
+                        print(f"  {hour:02d}:00 - {count} commits")
+                    
+                    print(f"\nMost active weekdays:")
+                    weekday = sorted(freq_data['weekday_distribution'].items(), 
+                                   key=lambda x: x[1], reverse=True)
+                    for day, count in weekday:
+                        print(f"  {day}: {count} commits")
             
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
