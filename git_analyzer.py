@@ -14,8 +14,10 @@ import calendar
 try:
     import git
     import click
-except ImportError:
-    print("Required packages not installed. Please run: pip install -r requirements.txt")
+    from visualizer import CommitVisualizer
+except ImportError as e:
+    print(f"Required packages not installed. Please run: pip install -r requirements.txt")
+    print(f"Import error: {e}")
     sys.exit(1)
 
 
@@ -85,7 +87,8 @@ class GitCommitAnalyzer:
 @click.option('--repo', '-r', default='.', help='Path to git repository (default: current directory)')
 @click.option('--output', '-o', type=click.Choice(['json', 'text']), default='text', help='Output format')
 @click.option('--frequency', '-f', is_flag=True, help='Include commit frequency analysis')
-def main(repo, output, frequency):
+@click.option('--visualize', '-v', is_flag=True, help='Generate visualization charts')
+def main(repo, output, frequency, visualize):
     """Analyze Git commit history and generate statistics."""
     try:
         analyzer = GitCommitAnalyzer(repo)
@@ -127,6 +130,18 @@ def main(repo, output, frequency):
                                    key=lambda x: x[1], reverse=True)
                     for day, count in weekday:
                         print(f"  {day}: {count} commits")
+        
+        if visualize and frequency and 'frequency_analysis' in stats:
+            try:
+                visualizer = CommitVisualizer()
+                plots = visualizer.generate_all_plots(stats['frequency_analysis'])
+                print(f"\n=== Visualizations Generated ===")
+                for plot in plots:
+                    print(f"  Created: {plot}")
+            except ImportError:
+                click.echo("Warning: matplotlib not available. Install it to generate charts.", err=True)
+            except Exception as e:
+                click.echo(f"Warning: Could not generate visualizations: {e}", err=True)
             
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
