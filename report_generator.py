@@ -1,0 +1,225 @@
+"""
+HTML Report Generator for Git Commit Analyzer
+"""
+
+from jinja2 import Template
+from datetime import datetime
+import base64
+import os
+
+class HTMLReportGenerator:
+    def __init__(self):
+        self.template_html = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git Commit Analysis Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .header {
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #495057;
+        }
+        .stat-label {
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .chart-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .chart-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+        }
+        .author-list {
+            list-style: none;
+            padding: 0;
+        }
+        .author-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .footer {
+            text-align: center;
+            color: #6c757d;
+            margin-top: 40px;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Git Commit Analysis Report</h1>
+        <p>Repository: {{ repo_path }}</p>
+        <p>Generated on {{ generation_date }}</p>
+    </div>
+
+    <div class="card">
+        <h2>📊 Overview</h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.total_commits }}</div>
+                <div class="stat-label">Total Commits</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.authors|length }}</div>
+                <div class="stat-label">Contributors</div>
+            </div>
+            {% if stats.date_range %}
+            <div class="stat-item">
+                <div class="stat-value">{{ project_duration_days }}</div>
+                <div class="stat-label">Days Active</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if stats.date_range %}
+    <div class="card">
+        <h2>📅 Project Timeline</h2>
+        <p><strong>First Commit:</strong> {{ stats.date_range.first_commit }}</p>
+        <p><strong>Latest Commit:</strong> {{ stats.date_range.last_commit }}</p>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>👥 Contributors</h2>
+        <ul class="author-list">
+            {% for author, count in sorted_authors %}
+            <li class="author-item">
+                <span>{{ author }}</span>
+                <span><strong>{{ count }}</strong> commits</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    {% if frequency_analysis %}
+    <div class="card">
+        <h2>⏰ Activity Patterns</h2>
+        
+        {% if charts.hourly %}
+        <div class="chart-container">
+            <h3>Commits by Hour</h3>
+            <img src="data:image/png;base64,{{ charts.hourly }}" alt="Hourly Distribution">
+        </div>
+        {% endif %}
+        
+        {% if charts.weekday %}
+        <div class="chart-container">
+            <h3>Commits by Weekday</h3>
+            <img src="data:image/png;base64,{{ charts.weekday }}" alt="Weekday Distribution">
+        </div>
+        {% endif %}
+        
+        {% if charts.timeline %}
+        <div class="chart-container">
+            <h3>Commit Timeline</h3>
+            <img src="data:image/png;base64,{{ charts.timeline }}" alt="Commit Timeline">
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p>Report generated by GitCommitAnalyzer</p>
+    </div>
+</body>
+</html>
+        """
+    
+    def _encode_image(self, image_path):
+        """Encode image file to base64 string."""
+        try:
+            with open(image_path, "rb") as img_file:
+                return base64.b64encode(img_file.read()).decode('utf-8')
+        except:
+            return None
+    
+    def _calculate_project_duration(self, date_range):
+        """Calculate project duration in days."""
+        try:
+            start = datetime.fromisoformat(date_range['first_commit'].replace('Z', '+00:00'))
+            end = datetime.fromisoformat(date_range['last_commit'].replace('Z', '+00:00'))
+            return (end - start).days
+        except:
+            return 0
+    
+    def generate_report(self, stats, repo_path=".", output_file="report.html", chart_files=None):
+        """Generate HTML report from statistics."""
+        template = Template(self.template_html)
+        
+        # Prepare data for template
+        context = {
+            'stats': stats,
+            'repo_path': os.path.abspath(repo_path),
+            'generation_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'sorted_authors': sorted(stats.get('authors', {}).items(), 
+                                   key=lambda x: x[1], reverse=True),
+            'frequency_analysis': stats.get('frequency_analysis'),
+            'project_duration_days': 0,
+            'charts': {}
+        }
+        
+        # Calculate project duration
+        if stats.get('date_range'):
+            context['project_duration_days'] = self._calculate_project_duration(
+                stats['date_range']
+            )
+        
+        # Encode chart images
+        if chart_files:
+            for chart_type, file_path in chart_files.items():
+                encoded_img = self._encode_image(file_path)
+                if encoded_img:
+                    context['charts'][chart_type] = encoded_img
+        
+        # Render template and save
+        html_content = template.render(**context)
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+        
+        return output_file
