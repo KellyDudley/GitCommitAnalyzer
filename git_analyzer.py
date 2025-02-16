@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """
 Git Commit Analyzer
-A tool for analyzing Git repository commit history and generating statistics.
+A comprehensive tool for analyzing Git repository commit history and generating statistics.
+
+Author: KellyDudley
+Version: 1.0.0
+License: MIT
 """
 
 import os
