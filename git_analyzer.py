@@ -97,7 +97,13 @@ class GitCommitAnalyzer:
 @click.option('--report', default='report.html', help='HTML report filename (when output=html)')
 @click.option('--export-csv', is_flag=True, help='Export data to CSV files')
 def main(repo, output, frequency, visualize, report, export_csv):
-    """Analyze Git commit history and generate statistics."""
+    """
+    Analyze Git commit history and generate comprehensive statistics.
+    
+    This tool helps developers understand their repository's development patterns,
+    contributor activity, and commit frequency trends through various output formats
+    including text summaries, JSON data, interactive HTML reports, and CSV exports.
+    """
     try:
         analyzer = GitCommitAnalyzer(repo)
         stats = analyzer.get_commit_stats()
